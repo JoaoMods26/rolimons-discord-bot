@@ -1,7 +1,8 @@
 const {
   Client,
   GatewayIntentBits,
-  EmbedBuilder
+  EmbedBuilder,
+  PermissionsBitField
 } = require("discord.js");
 
 // =====================
@@ -118,12 +119,23 @@ async function getItems() {
 
 function createItemEmbed(item) {
 
+  const gameText =
+    item.games?.length
+      ? item.games
+          .map(g =>
+            `[${g.name}](https://www.roblox.com/games/${g.game_id})`
+          )
+          .join("\n")
+      : "Unknown";
+
   return new EmbedBuilder()
 
-    .setTitle(item.name)
+    .setTitle(
+      `🔥 ${item.name.toUpperCase()} 🔥`
+    )
 
     .setURL(
-`https://www.roblox.com/catalog/${item.id}`
+      `https://www.roblox.com/catalog/${item.id}`
     )
 
     .setThumbnail(
@@ -137,46 +149,34 @@ function createItemEmbed(item) {
       )
     )
 
+    .setDescription(
+`# 📦 STOCK
+# ${item.availableStock}/${item.totalStock}`
+    )
+
     .addFields(
-
-      {
-        name:
-          "📦 STOCK DISPONIBLE",
-        value:
-`# ${item.availableStock}`,
-        inline: true
-      },
-
-      {
-        name:
-          "📦 STOCK TOTAL",
-        value:
-`# ${item.totalStock}`,
-        inline: true
-      },
-
-      {
-        name:
-          "📊 STOCK",
-        value:
-`# ${item.availableStock}/${item.totalStock}`,
-        inline: false
-      },
 
       {
         name:
           "🎮 JUEGO",
         value:
-item.games?.[0]?.name ||
-"Unknown",
+          gameText,
         inline: false
       },
 
       {
         name:
-          "🔗 LINK",
+          "🔗 ITEM",
         value:
-`https://www.roblox.com/catalog/${item.id}`,
+          `[CLICK AQUÍ](https://www.roblox.com/catalog/${item.id})`,
+        inline: false
+      },
+
+      {
+        name:
+          "🆔 ID",
+        value:
+          `\`${item.id}\``,
         inline: false
       }
 
@@ -186,7 +186,7 @@ item.games?.[0]?.name ||
 
     .setFooter({
       text:
-"Rolimons Tracker 😈"
+        "Rolimons Tracker 😈"
     });
 
 }
@@ -267,6 +267,17 @@ client.on(
 
     if (message.author.bot)
       return;
+
+    if (
+  message.content.startsWith("+") &&
+  !message.member?.permissions?.has(PermissionsBitField.Flags.Administrator)
+) {
+
+  return message.reply(
+    "❌ Solo administradores pueden usar este bot."
+  );
+
+}
 
     console.log(
       message.content
