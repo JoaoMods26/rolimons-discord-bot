@@ -110,7 +110,7 @@ function createItemEmbed(item) {
 
   return new EmbedBuilder()
 
-    .setTitle(`🔥 ${item.name.toUpperCase()} 🔥`)
+    .setTitle(item.name.toUpperCase())
     .setURL(`https://www.roblox.com/catalog/${item.id}`)
     .setThumbnail(item.thumbnail)
     .setImage(item.thumbnail.replace("/150/150/", "/420/420/"))
@@ -153,8 +153,6 @@ function createAnnouncementEmbed(item, titulo) {
     .setDescription(`## ${item.name}`)
 
     .setImage(item.thumbnail.replace("/150/150/", "/420/420/"))
-
-    .setURL(`https://www.roblox.com/catalog/${item.id}`)
 
     .setColor(0xff0000)
 
