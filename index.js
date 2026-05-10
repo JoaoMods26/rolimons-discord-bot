@@ -299,6 +299,99 @@ client.on(
     }
 
     // =====================
+// +help
+// =====================
+
+if (
+  message.content ===
+  "+help"
+) {
+
+  const embed =
+    new EmbedBuilder()
+
+      .setTitle(
+        "📚 COMANDOS DISPONIBLES"
+      )
+
+      .setDescription(
+`# 😈 Rolimons Tracker Commands`
+      )
+
+      .addFields(
+
+        {
+          name:
+            "🏓 +ping",
+          value:
+            "Verifica si el bot está online.",
+          inline: false
+        },
+
+        {
+          name:
+            "🔥 +actual",
+          value:
+            "Muestra el item más reciente.",
+          inline: false
+        },
+
+        {
+          name:
+            "🔥 +actual 5",
+          value:
+            "Muestra varios items recientes.",
+          inline: false
+        },
+
+        {
+          name:
+            "📦 +stok 100",
+          value:
+            "Busca items con 100 stock disponible.",
+          inline: false
+        },
+
+        {
+          name:
+            "📦 +sstok 100",
+          value:
+            "Busca items con 100 stock total.",
+          inline: false
+        },
+
+        {
+          name:
+            "🔄 +loop",
+          value:
+            "Activa detección automática de nuevos items.",
+          inline: false
+        },
+
+        {
+          name:
+            "🛑 +stop",
+          value:
+            "Detiene el loop automático.",
+          inline: false
+        }
+
+      )
+
+      .setColor(0xff0000)
+
+      .setFooter({
+        text:
+          "Rolimons Tracker 😈"
+      });
+
+  return message.reply({
+    embeds: [embed]
+  });
+
+}
+
+    // =====================
     // +actual
     // =====================
 
