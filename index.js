@@ -133,7 +133,7 @@ function createItemEmbed(item) {
       }
     )
     .setColor(0xff0000)
-    .setFooter({ text: "Rolimons Tracker 😈" });
+    .setFooter({ text: "Jory 😈" });
 
 }
 
@@ -158,7 +158,7 @@ function createAnnouncementEmbed(item, titulo) {
 
     .setColor(0xff0000)
 
-    .setFooter({ text: "Rolimons Tracker 😈" });
+    .setFooter({ text: "Jory 😈" });
 
 }
 
@@ -289,7 +289,7 @@ Ejemplo:
 
       )
       .setColor(0xff0000)
-      .setFooter({ text: "Rolimons Tracker 😈" });
+      .setFooter({ text: "Jory 😈" });
 
     return message.reply({ embeds: [embed] });
 
