@@ -2,18 +2,8 @@ const {
   Client,
   GatewayIntentBits,
   EmbedBuilder,
-  PermissionsBitField,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ChannelSelectMenuBuilder,
-  ChannelType,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle
+  PermissionsBitField
 } = require("discord.js");
-
-const fs = require("fs");
 
 // =====================
 // CLIENT
@@ -37,56 +27,12 @@ const client = new Client({
 const TOKEN = process.env.TOKEN;
 
 // =====================
-// CACHE PERSISTENTE EN DISCO
-// =====================
-
-const CACHE_FILE = "./item_cache.json";
-
-function loadCache() {
-
-  try {
-
-    if (fs.existsSync(CACHE_FILE)) {
-
-      const raw = fs.readFileSync(CACHE_FILE, "utf8");
-      const obj = JSON.parse(raw);
-      return new Map(Object.entries(obj));
-
-    }
-
-  } catch (err) {
-
-    console.error("❌ Error cargando cache:", err);
-
-  }
-
-  return new Map();
-
-}
-
-function saveCache(map) {
-
-  try {
-
-    const obj = Object.fromEntries(map);
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(obj, null, 2));
-
-  } catch (err) {
-
-    console.error("❌ Error guardando cache:", err);
-
-  }
-
-}
-
-// =====================
 // LOOP DATA
 // =====================
 
-let loopEnabled  = false;
-let loopChannel  = null;
-let sentItems    = new Set();
-let itemCache    = loadCache(); // ✅ carga desde disco al iniciar
+let loopEnabled = false;
+let loopChannel = null;
+let sentItems   = new Set();
 
 // =====================
 // ONLINE
@@ -99,7 +45,7 @@ client.once("clientReady", () => {
 });
 
 // =====================
-// GET ITEMS
+// GET ALL ITEMS
 // =====================
 
 async function getItems() {
@@ -109,27 +55,20 @@ async function getItems() {
   const match    = html.match(/item_details\s*=\s*(\{[\s\S]*?\});/);
 
   if (!match) {
-
     console.log("❌ item_details no encontrado");
     return null;
-
   }
 
   let data;
 
   try {
-
     data = JSON.parse(match[1]);
-
   } catch (err) {
-
     console.log(err);
     return null;
-
   }
 
   return Object.entries(data).map(([id, item]) => ({
-
     id,
     name:           item[0],
     timestamp:      item[1],
@@ -137,24 +76,27 @@ async function getItems() {
     availableStock: item[3],
     thumbnail:      item[5],
     games:          item[6]
-
   }));
 
 }
 
 // =====================
-// HELPER — guardar item en cache + disco
+// GET ITEM BY ID
+// Busca directamente por ID desde Rolimons
 // =====================
 
-function cacheItem(item) {
+async function getItemById(itemId) {
 
-  itemCache.set(item.id, item);
-  saveCache(itemCache); // ✅ persiste aunque el bot se reinicie
+  const items = await getItems();
+
+  if (!items) return null;
+
+  return items.find(x => x.id === itemId) || null;
 
 }
 
 // =====================
-// CREATE EMBEDS
+// EMBEDS
 // =====================
 
 function createItemEmbed(item) {
@@ -174,36 +116,49 @@ function createItemEmbed(item) {
     .setImage(item.thumbnail.replace("/150/150/", "/420/420/"))
     .setDescription(`# 📦 STOCK\n# ${item.availableStock}/${item.totalStock}`)
     .addFields(
-      { name: "🎮 JUEGO", value: gameText, inline: false },
-      { name: "🔗 ITEM",  value: `https://www.roblox.com/catalog/${item.id}`, inline: false },
-      { name: "🆔 ID",    value: `\`${item.id}\``, inline: false }
+      {
+        name:   "🎮 JUEGO",
+        value:  gameText,
+        inline: false
+      },
+      {
+        name:   "🔗 ITEM",
+        value:  `https://www.roblox.com/catalog/${item.id}`,
+        inline: false
+      },
+      {
+        name:   "🆔 ID",
+        value:  `\`${item.id}\``,
+        inline: false
+      }
     )
     .setColor(0xff0000)
-    .setFooter({ text: "Rolimons Tracker 😈" });
+    .setFooter({ text: "Jory" });
 
 }
 
-function createAnnounceButton(item) {
+// =====================
+// EMBED DE ANUNCIO
+// Título = texto que escribió el admin
+// Subtítulo = nombre del accesorio
+// Imagen grande = thumbnail del accesorio
+// =====================
 
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId(`announce_${item.id}`)
-      .setLabel("📢 Anunciar")
-      .setStyle(ButtonStyle.Primary)
-  );
-
-}
-
-function createAnnouncementEmbed(item, extraText) {
+function createAnnouncementEmbed(item, titulo) {
 
   return new EmbedBuilder()
-    .setTitle(`🎁 ${item.name}`)
+
+    .setTitle(titulo)
+
+    .setDescription(`## ${item.name}`)
+
     .setImage(item.thumbnail.replace("/150/150/", "/420/420/"))
-    .setDescription(
-      `# 📦 STOCK\n# ${item.availableStock}/${item.totalStock}\n\n${extraText || ""}`
-    )
+
+    .setURL(`https://www.roblox.com/catalog/${item.id}`)
+
     .setColor(0xff0000)
-    .setFooter({ text: "Anuncio UGC" });
+
+    .setFooter({ text: "Jory" });
 
 }
 
@@ -219,21 +174,18 @@ setInterval(async () => {
   if (!items) return;
 
   items.sort((a, b) => b.timestamp - a.timestamp);
+
   const newest = items[0];
 
   if (sentItems.has(newest.id)) return;
 
   sentItems.add(newest.id);
-  cacheItem(newest); // ✅ guardar ANTES de enviar
 
   try {
 
     const channel = await client.channels.fetch(loopChannel);
 
-    await channel.send({
-      embeds:     [createItemEmbed(newest)],
-      components: [createAnnounceButton(newest)]
-    });
+    await channel.send({ embeds: [createItemEmbed(newest)] });
 
     console.log(`🔥 Nuevo item enviado: ${newest.name}`);
 
@@ -262,36 +214,90 @@ client.on("messageCreate", async (message) => {
 
   console.log(message.content);
 
-  // ── +ping ──────────────────────────────────────
+  // ══════════════════════════════
+  // +ping
+  // ══════════════════════════════
 
   if (message.content === "+ping") {
+
     return message.reply("🏓 Pong 😈");
+
   }
 
-  // ── +help ──────────────────────────────────────
+  // ══════════════════════════════
+  // +help
+  // ══════════════════════════════
 
   if (message.content === "+help") {
 
     const embed = new EmbedBuilder()
+
       .setTitle("📚 COMANDOS DISPONIBLES")
-      .setDescription(`# 💖 Jory Commands`)
+      .setDescription("# 😈 Jory Commands")
       .addFields(
-        { name: "🏓 +ping",      value: "Verifica si el bot está online.",                  inline: false },
-        { name: "🔥 +actual",    value: "Muestra el item más reciente.",                    inline: false },
-        { name: "🔥 +actual 5",  value: "Muestra varios items recientes.",                  inline: false },
-        { name: "📦 +stok 100",  value: "Busca items con 100 stock disponible.",            inline: false },
-        { name: "📦 +sstok 100", value: "Busca items con 100 stock total.",                 inline: false },
-        { name: "🔄 +loop",      value: "Activa detección automática de nuevos items.",     inline: false },
-        { name: "🛑 +stop",      value: "Detiene el loop automático.",                      inline: false }
+
+        {
+          name:   "🏓 +ping",
+          value:  "Verifica si el bot está online.",
+          inline: false
+        },
+
+        {
+          name:   "🔥 +actual",
+          value:  "Muestra el item más reciente.",
+          inline: false
+        },
+
+        {
+          name:   "🔥 +actual 5",
+          value:  "Muestra varios items recientes.",
+          inline: false
+        },
+
+        {
+          name:   "📦 +stok 100",
+          value:  "Busca items con 100 stock disponible.",
+          inline: false
+        },
+
+        {
+          name:   "📦 +sstok 100",
+          value:  "Busca items con 100 stock total.",
+          inline: false
+        },
+
+        {
+          name:   "🔄 +loop [canalId]",
+          value:  "Activa detección automática de nuevos items.",
+          inline: false
+        },
+
+        {
+          name:   "🛑 +stop",
+          value:  "Detiene el loop automático.",
+          inline: false
+        },
+
+        {
+          name:   "📢 +anunciar <itemId> <#canal> <título del anuncio>",
+          value:
+`Busca el accesorio en Rolimons por su ID y lo anuncia en el canal con tu título.
+Ejemplo:
+\`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS POR TIEMPO LIMITADO!\``,
+          inline: false
+        }
+
       )
       .setColor(0xff0000)
-      .setFooter({ text: "Rolimons Tracker 😈" });
+      .setFooter({ text: "Jory" });
 
     return message.reply({ embeds: [embed] });
 
   }
 
-  // ── +actual ────────────────────────────────────
+  // ══════════════════════════════
+  // +actual
+  // ══════════════════════════════
 
   if (message.content.startsWith("+actual")) {
 
@@ -304,16 +310,20 @@ client.on("messageCreate", async (message) => {
     items.sort((a, b) => b.timestamp - a.timestamp);
 
     for (const item of items.slice(0, amount)) {
-      cacheItem(item);
+
       await message.channel.send({
-        embeds:     [createItemEmbed(item)],
-        components: [createAnnounceButton(item)]
+        embeds: [createItemEmbed(item)]
       });
+
     }
+
+    return;
 
   }
 
-  // ── +sstok (total stock) ───────────────────────
+  // ══════════════════════════════
+  // +sstok (total stock)
+  // ══════════════════════════════
 
   if (message.content.startsWith("+sstok")) {
 
@@ -330,16 +340,20 @@ client.on("messageCreate", async (message) => {
     if (filtered.length === 0) return message.reply("❌ No encontrados");
 
     for (const item of filtered.slice(0, 10)) {
-      cacheItem(item);
+
       await message.channel.send({
-        embeds:     [createItemEmbed(item)],
-        components: [createAnnounceButton(item)]
+        embeds: [createItemEmbed(item)]
       });
+
     }
+
+    return;
 
   }
 
-  // ── +stok (available stock) ────────────────────
+  // ══════════════════════════════
+  // +stok (available stock)
+  // ══════════════════════════════
 
   if (message.content.startsWith("+stok")) {
 
@@ -356,16 +370,20 @@ client.on("messageCreate", async (message) => {
     if (filtered.length === 0) return message.reply("❌ No encontrados");
 
     for (const item of filtered.slice(0, 10)) {
-      cacheItem(item);
+
       await message.channel.send({
-        embeds:     [createItemEmbed(item)],
-        components: [createAnnounceButton(item)]
+        embeds: [createItemEmbed(item)]
       });
+
     }
+
+    return;
 
   }
 
-  // ── +loop ──────────────────────────────────────
+  // ══════════════════════════════
+  // +loop
+  // ══════════════════════════════
 
   if (message.content.startsWith("+loop")) {
 
@@ -376,11 +394,13 @@ client.on("messageCreate", async (message) => {
     loopChannel = channelId;
     sentItems.clear();
 
-    return message.reply(`🔥 Loop activado 😈\n\nCanal:\n${channelId}`);
+    return message.reply(`🔥 Loop activado 😈\nCanal: ${channelId}`);
 
   }
 
-  // ── +stop ──────────────────────────────────────
+  // ══════════════════════════════
+  // +stop
+  // ══════════════════════════════
 
   if (message.content === "+stop") {
 
@@ -391,175 +411,102 @@ client.on("messageCreate", async (message) => {
 
   }
 
-});
-
-// =====================
-// INTERACTIONS
-// =====================
-
-client.on("interactionCreate", async (interaction) => {
-
-  // ════════════════════════════════════════════════
-  // BOTÓN — announce_<itemId>
-  // ════════════════════════════════════════════════
-
-  if (interaction.isButton()) {
-
-    if (interaction.customId.startsWith("announce_")) {
-
-      // ✅ deferReply AL INSTANTE — Discord exige respuesta en < 3 segundos
-      // Con deferReply tienes hasta 15 minutos para editReply
-      await interaction.deferReply({ ephemeral: true });
-
-      // ── Verificar permisos ──
-      if (
-        !interaction.memberPermissions?.has(
-          PermissionsBitField.Flags.Administrator
-        )
-      ) {
-        return interaction.editReply({
-          content: "❌ Solo administradores pueden usar esto."
-        });
-      }
-
-      // ── Extraer itemId (todo lo que sigue de "announce_") ──
-      const itemId = interaction.customId.slice("announce_".length);
-      const item   = itemCache.get(itemId);
-
-      if (!item) {
-        return interaction.editReply({
-          content: "❌ No encontré los datos de este item. Usa el comando otra vez."
-        });
-      }
-
-      // ── Selector de canal ──
-      const row = new ActionRowBuilder().addComponents(
-        new ChannelSelectMenuBuilder()
-          .setCustomId(`announce_channel|${itemId}`) // ✅ separador "|" — nunca se rompe
-          .setPlaceholder("Selecciona el canal del anuncio")
-          .setChannelTypes(ChannelType.GuildText)
-      );
-
-      return interaction.editReply({
-        content:    "📢 Selecciona el canal donde quieres anunciar este item:",
-        components: [row]
-      });
-
-    }
-
-  }
-
-  // ════════════════════════════════════════════════
-  // SELECT CANAL — announce_channel|<itemId>
+  // ══════════════════════════════
+  // +anunciar <itemId> <#canal> <título>
   //
-  // ⚠️  IMPORTANTE: este interaction abre un Modal.
-  //     Discord NO permite deferReply antes de showModal.
-  //     La respuesta DEBE ser showModal directamente.
-  //     El cache es solo lectura (instantáneo), así que
-  //     no hay riesgo de timeout aquí.
-  // ════════════════════════════════════════════════
+  // Ejemplo:
+  //   +anunciar 12345678 #ugc-free 🔥 ITEM GRATIS AHORA!
+  //
+  // El bot busca el ID directamente en Rolimons,
+  // no necesita cache ni nada previo.
+  // ══════════════════════════════
 
-  if (interaction.isChannelSelectMenu()) {
+  if (message.content.startsWith("+anunciar")) {
 
-    if (interaction.customId.startsWith("announce_channel|")) {
+    const args = message.content.split(" ");
 
-      const itemId    = interaction.customId.slice("announce_channel|".length);
-      const channelId = interaction.values[0];
-      const item      = itemCache.get(itemId);
+    // args[0] = "+anunciar"
+    // args[1] = itemId
+    // args[2] = #canal o canalId
+    // args[3..] = título del anuncio
 
-      // Si no hay item, no podemos abrir modal — defer + editReply
-      if (!item) {
-        await interaction.deferReply({ ephemeral: true });
-        return interaction.editReply({
-          content: "❌ No encontré los datos del item."
-        });
-      }
+    const itemId = args[1];
 
-      // ── Construir modal ──
-      const modal = new ModalBuilder()
-        .setCustomId(`announce_modal|${itemId}|${channelId}`) // ✅ separador "|"
-        .setTitle("Texto extra del anuncio");
-
-      const extraInput = new TextInputBuilder()
-        .setCustomId("extra_text")
-        .setLabel("Texto extra, links, notas, etc.")
-        .setStyle(TextInputStyle.Paragraph)
-        .setRequired(false)
-        .setMaxLength(1000);
-
-      modal.addComponents(
-        new ActionRowBuilder().addComponents(extraInput)
+    if (!itemId) {
+      return message.reply(
+`❌ Falta el ID del item.
+Uso: \`+anunciar <itemId> <#canal> <título>\`
+Ejemplo: \`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS!\``
       );
+    }
 
-      // ✅ showModal — es la respuesta directa a esta interacción
-      return interaction.showModal(modal);
+    const rawChannel = args[2];
+
+    if (!rawChannel) {
+      return message.reply(
+`❌ Falta el canal.
+Uso: \`+anunciar <itemId> <#canal> <título>\``
+      );
+    }
+
+    // Limpiar mención: <#123456> → 123456
+    const channelId = rawChannel.replace(/[<#>]/g, "");
+
+    // El título es todo lo que viene después del canal
+    const titulo = args.slice(3).join(" ");
+
+    if (!titulo) {
+      return message.reply(
+`❌ Falta el título del anuncio.
+Uso: \`+anunciar <itemId> <#canal> <título>\`
+Ejemplo: \`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS POR TIEMPO LIMITADO!\``
+      );
+    }
+
+    // Buscar el item en Rolimons por ID
+    const loadingMsg = await message.reply("🔍 Buscando item en Rolimons...");
+
+    const item = await getItemById(itemId);
+
+    if (!item) {
+      return loadingMsg.edit(
+        `❌ No encontré el item con ID \`${itemId}\` en Rolimons.\nVerifica que el ID sea correcto.`
+      );
+    }
+
+    // Obtener canal destino
+    let targetChannel;
+
+    try {
+
+      targetChannel = await client.channels.fetch(channelId);
+
+    } catch (err) {
+
+      return loadingMsg.edit(
+        `❌ No pude encontrar el canal \`${channelId}\`.\nVerifica el ID o la mención.`
+      );
 
     }
 
-  }
+    // Enviar anuncio
+    try {
 
-  // ════════════════════════════════════════════════
-  // MODAL SUBMIT — announce_modal|<itemId>|<channelId>
-  // ════════════════════════════════════════════════
+      const announceEmbed = createAnnouncementEmbed(item, titulo);
 
-  if (interaction.isModalSubmit()) {
+      await targetChannel.send({ embeds: [announceEmbed] });
 
-    if (interaction.customId.startsWith("announce_modal|")) {
+      return loadingMsg.edit(
+        `✅ Anuncio de **${item.name}** enviado a <#${channelId}> 😈`
+      );
 
-      // ✅ deferReply AL INSTANTE — el fetch del canal puede tardar
-      await interaction.deferReply({ ephemeral: true });
+    } catch (err) {
 
-      // ── Verificar permisos ──
-      if (
-        !interaction.memberPermissions?.has(
-          PermissionsBitField.Flags.Administrator
-        )
-      ) {
-        return interaction.editReply({
-          content: "❌ Solo administradores pueden usar esto."
-        });
-      }
+      console.error("❌ Error enviando anuncio:", err);
 
-      // ── Extraer partes con split("|") — 100% seguro con IDs de Discord ──
-      const parts     = interaction.customId.split("|");
-      // parts[0] = "announce_modal"
-      // parts[1] = itemId
-      // parts[2] = channelId
-      const itemId    = parts[1];
-      const channelId = parts[2];
-
-      const item = itemCache.get(itemId);
-
-      if (!item) {
-        return interaction.editReply({
-          content: "❌ No encontré los datos del item."
-        });
-      }
-
-      // ── Texto extra del modal ──
-      const extraText = interaction.fields.getTextInputValue("extra_text");
-
-      // ── Enviar anuncio ──
-      try {
-
-        const channel       = await client.channels.fetch(channelId);
-        const announceEmbed = createAnnouncementEmbed(item, extraText);
-
-        await channel.send({ embeds: [announceEmbed] });
-
-        return interaction.editReply({
-          content: "✅ Anuncio enviado correctamente."
-        });
-
-      } catch (err) {
-
-        console.error("❌ Error enviando anuncio:", err);
-
-        return interaction.editReply({
-          content: "❌ Hubo un error al enviar el anuncio. Verifica que el bot tenga permisos en ese canal."
-        });
-
-      }
+      return loadingMsg.edit(
+        `❌ No pude enviar en <#${channelId}>. Verifica que el bot tenga permisos en ese canal.`
+      );
 
     }
 
