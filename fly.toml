@@ -1,0 +1,5 @@
+app = "rolimons-discord-bot"
+primary_region = "mia"
+
+[build]
+  dockerfile = "Dockerfile"
