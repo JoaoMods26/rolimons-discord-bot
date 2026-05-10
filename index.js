@@ -359,7 +359,7 @@ if (
       )
 
       .setDescription(
-`# 😈 Rolimons Tracker Commands`
+`# 😈 Jory Commands`
       )
 
       .addFields(
