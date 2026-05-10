@@ -19,11 +19,12 @@ const {
 
 const client = new Client({
 
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
+intents: [
+  GatewayIntentBits.Guilds,
+  GatewayIntentBits.GuildMessages,
+  GatewayIntentBits.MessageContent,
+  GatewayIntentBits.GuildMembers
+]
 
 });
 
@@ -695,9 +696,9 @@ client.on(
     ) {
 
       if (
-        !interaction.member?.permissions?.has(
-          PermissionsBitField.Flags.Administrator
-        )
+!interaction.memberPermissions?.has(
+  PermissionsBitField.Flags.Administrator
+)
       ) {
 
         return interaction.reply({
@@ -826,9 +827,9 @@ client.on(
       ) {
 
         if (
-          !interaction.member?.permissions?.has(
-            PermissionsBitField.Flags.Administrator
-          )
+!interaction.memberPermissions?.has(
+  PermissionsBitField.Flags.Administrator
+)
         ) {
 
           return interaction.reply({
