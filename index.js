@@ -164,13 +164,13 @@ function createItemEmbed(item) {
         inline: false
       },
 
-      {
-        name:
-          "🔗 ITEM",
-        value:
-          `[CLICK AQUÍ](https://www.roblox.com/catalog/${item.id})`,
-        inline: false
-      },
+{
+  name:
+    "🔗 ITEM",
+  value:
+    `https://www.roblox.com/catalog/${item.id}`,
+  inline: false
+},
 
       {
         name:
