@@ -45,31 +45,18 @@ client.once("clientReady", () => {
 // =====================
 
 async function getItems() {
-
   try {
+    const response = await fetch("https://www.rolimons.com/free-roblox-limiteds");
+    const html = await response.text();
 
-    const response =
-      await fetch("https://www.rolimons.com/free-roblox-limiteds");
-
-    const html =
-      await response.text();
-
-    const match =
-      html.match(/item_details\s*=\s*(\{[\s\S]*?\});/);
+    const match = html.match(/item_details\s*=\s*(\{[\s\S]*?\});/);
 
     if (!match) {
       console.log("❌ item_details no encontrado");
       return null;
     }
 
-    let data;
-
-    try {
-      data = JSON.parse(match[1]);
-    } catch (err) {
-      console.log("❌ Error parseando JSON:", err);
-      return null;
-    }
+    const data = JSON.parse(match[1]);
 
     return Object.entries(data).map(([id, item]) => ({
       id,
@@ -80,14 +67,10 @@ async function getItems() {
       thumbnail: item[5],
       games: item[6]
     }));
-
   } catch (err) {
-
     console.log("❌ Error obteniendo items:", err);
     return null;
-
   }
-
 }
 
 // =====================
@@ -95,15 +78,11 @@ async function getItems() {
 // =====================
 
 async function getItemById(itemId) {
+  const items = await getItems();
 
-  const items =
-    await getItems();
-
-  if (!items)
-    return null;
+  if (!items) return null;
 
   return items.find(x => x.id === itemId) || null;
-
 }
 
 // =====================
@@ -111,34 +90,25 @@ async function getItemById(itemId) {
 // =====================
 
 async function searchItems(query) {
+  const items = await getItems();
 
-  const items =
-    await getItems();
+  if (!items) return null;
 
-  if (!items)
-    return null;
+  const cleanQuery = query.toLowerCase().trim();
 
-  const cleanQuery =
-    query.toLowerCase().trim();
+  const exactId = items.find(x => x.id === query.trim());
 
-  const exactId =
-    items.find(x => x.id === query.trim());
+  if (exactId) return [exactId];
 
-  if (exactId)
-    return [exactId];
+  const exactName = items.filter(x =>
+    x.name.toLowerCase() === cleanQuery
+  );
 
-  const exactName =
-    items.filter(x =>
-      x.name.toLowerCase() === cleanQuery
-    );
-
-  if (exactName.length > 0)
-    return exactName;
+  if (exactName.length > 0) return exactName;
 
   return items.filter(x =>
     x.name.toLowerCase().includes(cleanQuery)
   );
-
 }
 
 // =====================
@@ -146,38 +116,26 @@ async function searchItems(query) {
 // =====================
 
 async function getUniverseIdFromPlaceId(placeId) {
-
   try {
-
     console.log("🔍 Buscando universeId para:", placeId);
 
     const res = await fetch(
       `https://apis.roblox.com/universes/v1/places/${placeId}/universe`
     );
 
-    if (!res.ok) {
+    console.log("📡 Universe status:", res.status);
 
-      console.log("❌ Universe API status:", res.status);
+    if (!res.ok) return null;
 
-      return null;
-
-    }
-
-    const data =
-      await res.json();
+    const data = await res.json();
 
     console.log("✅ Universe data:", data);
 
     return data?.universeId || null;
-
   } catch (err) {
-
     console.log("❌ Error obteniendo universeId:", err);
-
     return null;
-
   }
-
 }
 
 // =====================
@@ -185,71 +143,48 @@ async function getUniverseIdFromPlaceId(placeId) {
 // =====================
 
 async function getExperienceEvents(placeId) {
-
   try {
-
     console.log("🎮 PlaceId:", placeId);
 
-    const universeId =
-      await getUniverseIdFromPlaceId(placeId);
+    const universeId = await getUniverseIdFromPlaceId(placeId);
 
     console.log("🌎 UniverseId:", universeId);
 
-    if (!universeId)
-      return null;
+    if (!universeId) return null;
 
-    const now =
-      new Date();
+    const now = new Date();
 
-    const fromUtc =
-      new Date(
-        now.getTime() - 1000 * 60 * 60 * 24 * 30
-      ).toISOString();
-
-    const toUtc =
-      new Date(
-        now.getTime() + 1000 * 60 * 60 * 24 * 60
-      ).toISOString();
+    const fromUtc = new Date(
+      now.getTime() - 1000 * 60 * 60 * 24 * 60
+    ).toISOString();
 
     const url =
-`https://apis.roblox.com/virtual-events/v1/virtual-events?fromUtc=${encodeURIComponent(fromUtc)}&toUtc=${encodeURIComponent(toUtc)}&universeIds=${universeId}`;
+      `https://apis.roblox.com/virtual-events/v1/virtual-events?fromUtc=${encodeURIComponent(fromUtc)}&universeIds=${universeId}`;
 
     console.log("🌐 Events URL:", url);
 
-    const res =
-      await fetch(url);
+    const res = await fetch(url);
 
     console.log("📡 Events status:", res.status);
 
-    if (!res.ok)
-      return null;
+    if (!res.ok) return null;
 
-    const data =
-      await res.json();
+    const data = await res.json();
 
-    console.log(
-      "✅ Events data:",
-      JSON.stringify(data).slice(0, 2000)
-    );
+    console.log("✅ Events data:", JSON.stringify(data).slice(0, 2000));
 
-    const events =
-      data?.data || [];
+    const events = data?.data || [];
 
     if (!events.length) {
-
       console.log("❌ No events");
-
       return null;
-
     }
 
-    const event =
-      events[0];
+    const event = events[0];
 
     console.log("🔥 Event found:", event.title);
 
     return {
-
       title:
         event.title ||
         event.displayTitle ||
@@ -271,20 +206,12 @@ async function getExperienceEvents(placeId) {
       endTime:
         event.eventTime?.endUtc ||
         null
-
     };
 
   } catch (err) {
-
-    console.log(
-      "❌ Error obteniendo eventos:",
-      err
-    );
-
+    console.log("❌ Error obteniendo eventos:", err);
     return null;
-
   }
-
 }
 
 // =====================
@@ -292,21 +219,16 @@ async function getExperienceEvents(placeId) {
 // =====================
 
 function formatEventDate(value) {
+  if (!value) return "Sin datos";
 
-  if (!value)
-    return "Sin datos";
+  const date = new Date(value);
 
-  const date =
-    new Date(value);
-
-  if (isNaN(date.getTime()))
-    return "Sin datos";
+  if (isNaN(date.getTime())) return "Sin datos";
 
   return date.toLocaleString("es-ES", {
     dateStyle: "medium",
     timeStyle: "short"
   });
-
 }
 
 // =====================
@@ -314,7 +236,6 @@ function formatEventDate(value) {
 // =====================
 
 async function createItemEmbed(item) {
-
   const gameText =
     item.games?.length
       ? item.games
@@ -324,8 +245,7 @@ async function createItemEmbed(item) {
           .join("\n")
       : "Unknown";
 
-  const firstGameId =
-    item.games?.[0]?.game_id;
+  const firstGameId = item.games?.[0]?.game_id;
 
   console.log("🎯 Game ID:", firstGameId);
 
@@ -344,30 +264,17 @@ ${eventData.subtitle}
 🕒 ${formatEventDate(eventData.startTime)} - ${formatEventDate(eventData.endTime)}
 
 ${eventData.description}`
-      : "Sin datos de eventos";
+      : "⚠️ EVENT TEST V3: No se detectó evento desde la API";
 
   return new EmbedBuilder()
-
     .setTitle(item.name.toUpperCase())
-
-    .setURL(
-      `https://www.roblox.com/catalog/${item.id}`
-    )
-
+    .setURL(`https://www.roblox.com/catalog/${item.id}`)
     .setThumbnail(item.thumbnail)
-
-    .setImage(
-      item.thumbnail.replace(
-        "/150/150/",
-        "/420/420/"
-      )
-    )
-
+    .setImage(item.thumbnail.replace("/150/150/", "/420/420/"))
     .setDescription(
 `# 📦 STOCK
 # ${item.availableStock}/${item.totalStock}`
     )
-
     .addFields(
       {
         name: "🎮 JUEGO",
@@ -381,8 +288,7 @@ ${eventData.description}`
       },
       {
         name: "🔗 ITEM",
-        value:
-`https://www.roblox.com/catalog/${item.id}`,
+        value: `https://www.roblox.com/catalog/${item.id}`,
         inline: false
       },
       {
@@ -391,13 +297,10 @@ ${eventData.description}`
         inline: false
       }
     )
-
     .setColor(0xff0000)
-
     .setFooter({
       text: "Jory 😈"
     });
-
 }
 
 // =====================
@@ -405,31 +308,19 @@ ${eventData.description}`
 // =====================
 
 function createAnnouncementEmbed(item, titulo) {
-
   return new EmbedBuilder()
-
     .setTitle(titulo)
-
     .setDescription(
 `## ${item.name}
 
 # 📦 STOCK
 # ${item.availableStock}/${item.totalStock}`
     )
-
-    .setImage(
-      item.thumbnail.replace(
-        "/150/150/",
-        "/420/420/"
-      )
-    )
-
+    .setImage(item.thumbnail.replace("/150/150/", "/420/420/"))
     .setColor(0xff0000)
-
     .setFooter({
       text: "Jory 😈"
     });
-
 }
 
 // =====================
@@ -437,32 +328,22 @@ function createAnnouncementEmbed(item, titulo) {
 // =====================
 
 setInterval(async () => {
+  if (!loopEnabled) return;
 
-  if (!loopEnabled)
-    return;
+  const items = await getItems();
 
-  const items =
-    await getItems();
+  if (!items) return;
 
-  if (!items)
-    return;
+  items.sort((a, b) => b.timestamp - a.timestamp);
 
-  items.sort((a, b) =>
-    b.timestamp - a.timestamp
-  );
+  const newest = items[0];
 
-  const newest =
-    items[0];
-
-  if (sentItems.has(newest.id))
-    return;
+  if (sentItems.has(newest.id)) return;
 
   sentItems.add(newest.id);
 
   try {
-
-    const channel =
-      await client.channels.fetch(loopChannel);
+    const channel = await client.channels.fetch(loopChannel);
 
     await channel.send({
       embeds: [
@@ -470,16 +351,10 @@ setInterval(async () => {
       ]
     });
 
-    console.log(
-      `🔥 Nuevo item enviado: ${newest.name}`
-    );
-
+    console.log(`🔥 Nuevo item enviado: ${newest.name}`);
   } catch (err) {
-
     console.log(err);
-
   }
-
 }, 10000);
 
 // =====================
@@ -487,9 +362,7 @@ setInterval(async () => {
 // =====================
 
 client.on("messageCreate", async (message) => {
-
-  if (message.author.bot)
-    return;
+  if (message.author.bot) return;
 
   if (
     message.content.startsWith("+") &&
@@ -505,7 +378,7 @@ client.on("messageCreate", async (message) => {
   console.log("💬", message.content);
 
   // =====================
-  // PING
+  // +ping
   // =====================
 
   if (message.content === "+ping") {
@@ -513,53 +386,152 @@ client.on("messageCreate", async (message) => {
   }
 
   // =====================
-  // ACTUAL
+  // +help
+  // =====================
+
+  if (message.content === "+help") {
+    const embed = new EmbedBuilder()
+      .setTitle("📚 COMANDOS DISPONIBLES")
+      .setDescription("# 😈 Jory Commands")
+      .addFields(
+        {
+          name: "🏓 +ping",
+          value: "Verifica si el bot está online.",
+          inline: false
+        },
+        {
+          name: "🔥 +actual",
+          value: "Muestra el item más reciente.",
+          inline: false
+        },
+        {
+          name: "🔥 +actual 5",
+          value: "Muestra varios items recientes.",
+          inline: false
+        },
+        {
+          name: "🔎 +buscar <id o nombre>",
+          value:
+`Busca un item exacto por ID o nombre.
+Ejemplo:
+\`+buscar 123456789\`
+\`+buscar crown\``,
+          inline: false
+        },
+        {
+          name: "🧪 +eventtest <placeId>",
+          value:
+`Prueba si la API de eventos devuelve datos de una experiencia.
+Ejemplo:
+\`+eventtest 95517353097886\``,
+          inline: false
+        },
+        {
+          name: "📦 +stok 100",
+          value: "Busca items con 100 stock disponible.",
+          inline: false
+        },
+        {
+          name: "📦 +sstok 100",
+          value: "Busca items con 100 stock total.",
+          inline: false
+        },
+        {
+          name: "🔄 +loop [canalId]",
+          value: "Activa detección automática de nuevos items.",
+          inline: false
+        },
+        {
+          name: "🛑 +stop",
+          value: "Detiene el loop automático.",
+          inline: false
+        },
+        {
+          name: "📢 +anunciar <itemId> <#canal> <título>",
+          value:
+`Busca el accesorio por ID y lo anuncia en el canal.
+Ejemplo:
+\`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS!\``,
+          inline: false
+        }
+      )
+      .setColor(0xff0000)
+      .setFooter({
+        text: "Jory 😈"
+      });
+
+    return message.reply({
+      embeds: [embed]
+    });
+  }
+
+  // =====================
+  // +eventtest
+  // =====================
+
+  if (message.content.startsWith("+eventtest")) {
+    const args = message.content.split(" ");
+    const placeId = args[1];
+
+    if (!placeId) {
+      return message.reply("❌ Usa: +eventtest <placeId>");
+    }
+
+    const loadingMsg = await message.reply("🔎 Probando eventos...");
+
+    const eventData = await getExperienceEvents(placeId);
+
+    if (!eventData) {
+      return loadingMsg.edit(
+        "⚠️ EVENT TEST V3: No se detectó evento desde la API."
+      );
+    }
+
+    return loadingMsg.edit(
+`✅ Evento encontrado:
+
+**${eventData.title}**
+${eventData.subtitle}
+
+🕒 ${formatEventDate(eventData.startTime)} - ${formatEventDate(eventData.endTime)}
+
+${eventData.description}`
+    );
+  }
+
+  // =====================
+  // +actual
   // =====================
 
   if (message.content.startsWith("+actual")) {
+    const args = message.content.split(" ");
+    const amount = parseInt(args[1]) || 1;
 
-    const args =
-      message.content.split(" ");
+    const items = await getItems();
 
-    const amount =
-      parseInt(args[1]) || 1;
+    if (!items) {
+      return message.reply("❌ Error obteniendo items");
+    }
 
-    const items =
-      await getItems();
-
-    if (!items)
-      return message.reply(
-        "❌ Error obteniendo items"
-      );
-
-    items.sort((a, b) =>
-      b.timestamp - a.timestamp
-    );
+    items.sort((a, b) => b.timestamp - a.timestamp);
 
     for (const item of items.slice(0, amount)) {
-
       await message.channel.send({
         embeds: [
           await createItemEmbed(item)
         ]
       });
-
     }
 
     return;
-
   }
 
   // =====================
-  // BUSCAR
+  // +buscar
   // =====================
 
   if (message.content.startsWith("+buscar")) {
-
-    const query =
-      message.content
-        .replace("+buscar", "")
-        .trim();
+    const query = message.content.replace("+buscar", "").trim();
 
     if (!query) {
       return message.reply(
@@ -568,133 +540,207 @@ client.on("messageCreate", async (message) => {
       );
     }
 
-    const loadingMsg =
-      await message.reply(
-        "🔎 Buscando item..."
-      );
+    const loadingMsg = await message.reply("🔎 Buscando item...");
 
-    const results =
-      await searchItems(query);
+    const results = await searchItems(query);
 
     if (!results || results.length === 0) {
-
       return loadingMsg.edit(
         `❌ No encontré resultados para: \`${query}\``
       );
-
     }
 
-    const limitedResults =
-      results.slice(0, 5);
+    const limitedResults = results.slice(0, 5);
 
     await loadingMsg.edit(
-`✅ Encontré ${results.length} resultado(s).`
+      `✅ Encontré ${results.length} resultado(s). Mostrando ${limitedResults.length}.`
     );
 
     for (const item of limitedResults) {
-
       await message.channel.send({
         embeds: [
           await createItemEmbed(item)
         ]
       });
-
     }
 
     return;
-
   }
 
   // =====================
-  // STOCK
-  // =====================
-
-  if (message.content.startsWith("+stok")) {
-
-    const args =
-      message.content.split(" ");
-
-    const stock =
-      parseInt(args[1]);
-
-    if (!stock)
-      return message.reply(
-        "❌ Usa: +stok 100"
-      );
-
-    const items =
-      await getItems();
-
-    if (!items)
-      return;
-
-    const filtered =
-      items.filter(
-        x => x.availableStock === stock
-      );
-
-    if (!filtered.length)
-      return message.reply(
-        "❌ No encontrados"
-      );
-
-    for (const item of filtered.slice(0, 10)) {
-
-      await message.channel.send({
-        embeds: [
-          await createItemEmbed(item)
-        ]
-      });
-
-    }
-
-  }
-
-  // =====================
-  // TOTAL STOCK
+  // +sstok
   // =====================
 
   if (message.content.startsWith("+sstok")) {
+    const args = message.content.split(" ");
+    const stock = parseInt(args[1]);
 
-    const args =
-      message.content.split(" ");
+    if (!stock) {
+      return message.reply("❌ Usa: +sstok 100");
+    }
 
-    const stock =
-      parseInt(args[1]);
+    const items = await getItems();
 
-    if (!stock)
-      return message.reply(
-        "❌ Usa: +sstok 100"
-      );
+    if (!items) return;
 
-    const items =
-      await getItems();
+    const filtered = items.filter(
+      x => x.totalStock === stock
+    );
 
-    if (!items)
-      return;
-
-    const filtered =
-      items.filter(
-        x => x.totalStock === stock
-      );
-
-    if (!filtered.length)
-      return message.reply(
-        "❌ No encontrados"
-      );
+    if (!filtered.length) {
+      return message.reply("❌ No encontrados");
+    }
 
     for (const item of filtered.slice(0, 10)) {
-
       await message.channel.send({
         embeds: [
           await createItemEmbed(item)
         ]
       });
-
     }
 
+    return;
   }
 
+  // =====================
+  // +stok
+  // =====================
+
+  if (message.content.startsWith("+stok")) {
+    const args = message.content.split(" ");
+    const stock = parseInt(args[1]);
+
+    if (!stock) {
+      return message.reply("❌ Usa: +stok 100");
+    }
+
+    const items = await getItems();
+
+    if (!items) return;
+
+    const filtered = items.filter(
+      x => x.availableStock === stock
+    );
+
+    if (!filtered.length) {
+      return message.reply("❌ No encontrados");
+    }
+
+    for (const item of filtered.slice(0, 10)) {
+      await message.channel.send({
+        embeds: [
+          await createItemEmbed(item)
+        ]
+      });
+    }
+
+    return;
+  }
+
+  // =====================
+  // +loop
+  // =====================
+
+  if (message.content.startsWith("+loop")) {
+    const args = message.content.split(" ");
+    const channelId = args[1] || message.channel.id;
+
+    loopEnabled = true;
+    loopChannel = channelId;
+    sentItems.clear();
+
+    return message.reply(
+      `🔥 Loop activado 😈\nCanal: ${channelId}`
+    );
+  }
+
+  // =====================
+  // +stop
+  // =====================
+
+  if (message.content === "+stop") {
+    loopEnabled = false;
+    loopChannel = null;
+
+    return message.reply("🛑 Loop detenido 😈");
+  }
+
+  // =====================
+  // +anunciar
+  // =====================
+
+  if (message.content.startsWith("+anunciar")) {
+    const args = message.content.split(" ");
+
+    const itemId = args[1];
+
+    if (!itemId) {
+      return message.reply(
+`❌ Falta el ID del item.
+Uso: \`+anunciar <itemId> <#canal> <título>\`
+Ejemplo: \`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS!\``
+      );
+    }
+
+    const rawChannel = args[2];
+
+    if (!rawChannel) {
+      return message.reply(
+`❌ Falta el canal.
+Uso: \`+anunciar <itemId> <#canal> <título>\``
+      );
+    }
+
+    const channelId = rawChannel.replace(/[<#>]/g, "");
+
+    const titulo = args.slice(3).join(" ");
+
+    if (!titulo) {
+      return message.reply(
+`❌ Falta el título del anuncio.
+Uso: \`+anunciar <itemId> <#canal> <título>\`
+Ejemplo: \`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS POR TIEMPO LIMITADO!\``
+      );
+    }
+
+    const loadingMsg = await message.reply("🔍 Buscando item en Rolimons...");
+
+    const item = await getItemById(itemId);
+
+    if (!item) {
+      return loadingMsg.edit(
+        `❌ No encontré el item con ID \`${itemId}\` en Rolimons.\nVerifica que el ID sea correcto.`
+      );
+    }
+
+    let targetChannel;
+
+    try {
+      targetChannel = await client.channels.fetch(channelId);
+    } catch (err) {
+      return loadingMsg.edit(
+        `❌ No pude encontrar el canal \`${channelId}\`.\nVerifica el ID o la mención.`
+      );
+    }
+
+    try {
+      const announceEmbed = createAnnouncementEmbed(item, titulo);
+
+      await targetChannel.send({
+        embeds: [announceEmbed]
+      });
+
+      return loadingMsg.edit(
+        `✅ Anuncio de **${item.name}** enviado a <#${channelId}> 😈`
+      );
+    } catch (err) {
+      console.error("❌ Error enviando anuncio:", err);
+
+      return loadingMsg.edit(
+        `❌ No pude enviar en <#${channelId}>. Verifica que el bot tenga permisos en ese canal.`
+      );
+    }
+  }
 });
 
 // =====================
