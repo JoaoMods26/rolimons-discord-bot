@@ -41,22 +41,27 @@ client.once("clientReady", () => {
 });
 
 // =====================
-// GET ALL ITEMS
+// GET ITEMS
 // =====================
 
 async function getItems() {
   try {
-    const response = await fetch("https://www.rolimons.com/free-roblox-limiteds");
-    const html = await response.text();
+    const response =
+      await fetch("https://www.rolimons.com/free-roblox-limiteds");
 
-    const match = html.match(/item_details\s*=\s*(\{[\s\S]*?\});/);
+    const html =
+      await response.text();
+
+    const match =
+      html.match(/item_details\s*=\s*(\{[\s\S]*?\});/);
 
     if (!match) {
       console.log("❌ item_details no encontrado");
       return null;
     }
 
-    const data = JSON.parse(match[1]);
+    const data =
+      JSON.parse(match[1]);
 
     return Object.entries(data).map(([id, item]) => ({
       id,
@@ -67,6 +72,7 @@ async function getItems() {
       thumbnail: item[5],
       games: item[6]
     }));
+
   } catch (err) {
     console.log("❌ Error obteniendo items:", err);
     return null;
@@ -79,7 +85,6 @@ async function getItems() {
 
 async function getItemById(itemId) {
   const items = await getItems();
-
   if (!items) return null;
 
   return items.find(x => x.id === itemId) || null;
@@ -91,18 +96,19 @@ async function getItemById(itemId) {
 
 async function searchItems(query) {
   const items = await getItems();
-
   if (!items) return null;
 
   const cleanQuery = query.toLowerCase().trim();
 
-  const exactId = items.find(x => x.id === query.trim());
+  const exactId =
+    items.find(x => x.id === query.trim());
 
   if (exactId) return [exactId];
 
-  const exactName = items.filter(x =>
-    x.name.toLowerCase() === cleanQuery
-  );
+  const exactName =
+    items.filter(x =>
+      x.name.toLowerCase() === cleanQuery
+    );
 
   if (exactName.length > 0) return exactName;
 
@@ -117,21 +123,21 @@ async function searchItems(query) {
 
 async function getUniverseIdFromPlaceId(placeId) {
   try {
-    console.log("🔍 Buscando universeId para:", placeId);
+    const res =
+      await fetch(
+        `https://apis.roblox.com/universes/v1/places/${placeId}/universe`
+      );
 
-    const res = await fetch(
-      `https://apis.roblox.com/universes/v1/places/${placeId}/universe`
-    );
+    if (!res.ok) {
+      console.log("❌ Universe status:", res.status);
+      return null;
+    }
 
-    console.log("📡 Universe status:", res.status);
-
-    if (!res.ok) return null;
-
-    const data = await res.json();
-
-    console.log("✅ Universe data:", data);
+    const data =
+      await res.json();
 
     return data?.universeId || null;
+
   } catch (err) {
     console.log("❌ Error obteniendo universeId:", err);
     return null;
@@ -144,45 +150,50 @@ async function getUniverseIdFromPlaceId(placeId) {
 
 async function getExperienceEvents(placeId) {
   try {
-    console.log("🎮 PlaceId:", placeId);
-
-    const universeId = await getUniverseIdFromPlaceId(placeId);
-
-    console.log("🌎 UniverseId:", universeId);
+    const universeId =
+      await getUniverseIdFromPlaceId(placeId);
 
     if (!universeId) return null;
 
-    const now = new Date();
+    const now =
+      new Date();
 
-    const fromUtc = new Date(
-      now.getTime() - 1000 * 60 * 60 * 24 * 60
-    ).toISOString();
+    const fromUtc =
+      new Date(
+        now.getTime() - 1000 * 60 * 60 * 24 * 60
+      ).toISOString();
 
     const url =
-      `https://apis.roblox.com/virtual-events/v1/virtual-events?fromUtc=${encodeURIComponent(fromUtc)}&universeIds=${universeId}`;
+      `https://apis.roblox.com/virtual-events/v1/universes/${universeId}/virtual-events?fromUtc=${encodeURIComponent(fromUtc)}`;
 
-    console.log("🌐 Events URL:", url);
-
-    const res = await fetch(url);
+    const res =
+      await fetch(url, {
+        headers: {
+          "accept": "application/json, text/plain, */*",
+          "origin": "https://www.roblox.com",
+          "referer": "https://www.roblox.com/"
+        }
+      });
 
     console.log("📡 Events status:", res.status);
 
     if (!res.ok) return null;
 
-    const data = await res.json();
+    const data =
+      await res.json();
 
-    console.log("✅ Events data:", JSON.stringify(data).slice(0, 2000));
+    console.log(
+      "✅ Events data:",
+      JSON.stringify(data).slice(0, 1000)
+    );
 
-    const events = data?.data || [];
+    const events =
+      data?.data || [];
 
-    if (!events.length) {
-      console.log("❌ No events");
-      return null;
-    }
+    if (!events.length) return null;
 
-    const event = events[0];
-
-    console.log("🔥 Event found:", event.title);
+    const event =
+      events[0];
 
     return {
       title:
@@ -245,16 +256,13 @@ async function createItemEmbed(item) {
           .join("\n")
       : "Unknown";
 
-  const firstGameId = item.games?.[0]?.game_id;
-
-  console.log("🎯 Game ID:", firstGameId);
+  const firstGameId =
+    item.games?.[0]?.game_id;
 
   const eventData =
     firstGameId
       ? await getExperienceEvents(firstGameId)
       : null;
-
-  console.log("📅 EventData:", eventData);
 
   const eventText =
     eventData
@@ -264,7 +272,7 @@ ${eventData.subtitle}
 🕒 ${formatEventDate(eventData.startTime)} - ${formatEventDate(eventData.endTime)}
 
 ${eventData.description}`
-      : "⚠️ EVENT TEST V3: No se detectó evento desde la API";
+      : "⚠️ EVENT TEST V4: No se detectó evento desde la API";
 
   return new EmbedBuilder()
     .setTitle(item.name.toUpperCase())
@@ -330,20 +338,23 @@ function createAnnouncementEmbed(item, titulo) {
 setInterval(async () => {
   if (!loopEnabled) return;
 
-  const items = await getItems();
+  const items =
+    await getItems();
 
   if (!items) return;
 
   items.sort((a, b) => b.timestamp - a.timestamp);
 
-  const newest = items[0];
+  const newest =
+    items[0];
 
   if (sentItems.has(newest.id)) return;
 
   sentItems.add(newest.id);
 
   try {
-    const channel = await client.channels.fetch(loopChannel);
+    const channel =
+      await client.channels.fetch(loopChannel);
 
     await channel.send({
       embeds: [
@@ -377,17 +388,9 @@ client.on("messageCreate", async (message) => {
 
   console.log("💬", message.content);
 
-  // =====================
-  // +ping
-  // =====================
-
   if (message.content === "+ping") {
     return message.reply("🏓 Pong 😈");
   }
-
-  // =====================
-  // +help
-  // =====================
 
   if (message.content === "+help") {
     const embed = new EmbedBuilder()
@@ -421,7 +424,7 @@ Ejemplo:
         {
           name: "🧪 +eventtest <placeId>",
           value:
-`Prueba si la API de eventos devuelve datos de una experiencia.
+`Prueba eventos de una experiencia.
 Ejemplo:
 \`+eventtest 95517353097886\``,
           inline: false
@@ -465,25 +468,26 @@ Ejemplo:
     });
   }
 
-  // =====================
-  // +eventtest
-  // =====================
-
   if (message.content.startsWith("+eventtest")) {
-    const args = message.content.split(" ");
-    const placeId = args[1];
+    const args =
+      message.content.split(" ");
+
+    const placeId =
+      args[1];
 
     if (!placeId) {
       return message.reply("❌ Usa: +eventtest <placeId>");
     }
 
-    const loadingMsg = await message.reply("🔎 Probando eventos...");
+    const loadingMsg =
+      await message.reply("🔎 Probando eventos...");
 
-    const eventData = await getExperienceEvents(placeId);
+    const eventData =
+      await getExperienceEvents(placeId);
 
     if (!eventData) {
       return loadingMsg.edit(
-        "⚠️ EVENT TEST V3: No se detectó evento desde la API."
+        "⚠️ EVENT TEST V4: No se detectó evento desde la API."
       );
     }
 
@@ -499,15 +503,15 @@ ${eventData.description}`
     );
   }
 
-  // =====================
-  // +actual
-  // =====================
-
   if (message.content.startsWith("+actual")) {
-    const args = message.content.split(" ");
-    const amount = parseInt(args[1]) || 1;
+    const args =
+      message.content.split(" ");
 
-    const items = await getItems();
+    const amount =
+      parseInt(args[1]) || 1;
+
+    const items =
+      await getItems();
 
     if (!items) {
       return message.reply("❌ Error obteniendo items");
@@ -526,12 +530,11 @@ ${eventData.description}`
     return;
   }
 
-  // =====================
-  // +buscar
-  // =====================
-
   if (message.content.startsWith("+buscar")) {
-    const query = message.content.replace("+buscar", "").trim();
+    const query =
+      message.content
+        .replace("+buscar", "")
+        .trim();
 
     if (!query) {
       return message.reply(
@@ -540,9 +543,11 @@ ${eventData.description}`
       );
     }
 
-    const loadingMsg = await message.reply("🔎 Buscando item...");
+    const loadingMsg =
+      await message.reply("🔎 Buscando item...");
 
-    const results = await searchItems(query);
+    const results =
+      await searchItems(query);
 
     if (!results || results.length === 0) {
       return loadingMsg.edit(
@@ -550,7 +555,8 @@ ${eventData.description}`
       );
     }
 
-    const limitedResults = results.slice(0, 5);
+    const limitedResults =
+      results.slice(0, 5);
 
     await loadingMsg.edit(
       `✅ Encontré ${results.length} resultado(s). Mostrando ${limitedResults.length}.`
@@ -567,25 +573,26 @@ ${eventData.description}`
     return;
   }
 
-  // =====================
-  // +sstok
-  // =====================
-
   if (message.content.startsWith("+sstok")) {
-    const args = message.content.split(" ");
-    const stock = parseInt(args[1]);
+    const args =
+      message.content.split(" ");
+
+    const stock =
+      parseInt(args[1]);
 
     if (!stock) {
       return message.reply("❌ Usa: +sstok 100");
     }
 
-    const items = await getItems();
+    const items =
+      await getItems();
 
     if (!items) return;
 
-    const filtered = items.filter(
-      x => x.totalStock === stock
-    );
+    const filtered =
+      items.filter(
+        x => x.totalStock === stock
+      );
 
     if (!filtered.length) {
       return message.reply("❌ No encontrados");
@@ -602,25 +609,26 @@ ${eventData.description}`
     return;
   }
 
-  // =====================
-  // +stok
-  // =====================
-
   if (message.content.startsWith("+stok")) {
-    const args = message.content.split(" ");
-    const stock = parseInt(args[1]);
+    const args =
+      message.content.split(" ");
+
+    const stock =
+      parseInt(args[1]);
 
     if (!stock) {
       return message.reply("❌ Usa: +stok 100");
     }
 
-    const items = await getItems();
+    const items =
+      await getItems();
 
     if (!items) return;
 
-    const filtered = items.filter(
-      x => x.availableStock === stock
-    );
+    const filtered =
+      items.filter(
+        x => x.availableStock === stock
+      );
 
     if (!filtered.length) {
       return message.reply("❌ No encontrados");
@@ -637,13 +645,12 @@ ${eventData.description}`
     return;
   }
 
-  // =====================
-  // +loop
-  // =====================
-
   if (message.content.startsWith("+loop")) {
-    const args = message.content.split(" ");
-    const channelId = args[1] || message.channel.id;
+    const args =
+      message.content.split(" ");
+
+    const channelId =
+      args[1] || message.channel.id;
 
     loopEnabled = true;
     loopChannel = channelId;
@@ -654,10 +661,6 @@ ${eventData.description}`
     );
   }
 
-  // =====================
-  // +stop
-  // =====================
-
   if (message.content === "+stop") {
     loopEnabled = false;
     loopChannel = null;
@@ -665,14 +668,12 @@ ${eventData.description}`
     return message.reply("🛑 Loop detenido 😈");
   }
 
-  // =====================
-  // +anunciar
-  // =====================
-
   if (message.content.startsWith("+anunciar")) {
-    const args = message.content.split(" ");
+    const args =
+      message.content.split(" ");
 
-    const itemId = args[1];
+    const itemId =
+      args[1];
 
     if (!itemId) {
       return message.reply(
@@ -682,7 +683,8 @@ Ejemplo: \`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS!\``
       );
     }
 
-    const rawChannel = args[2];
+    const rawChannel =
+      args[2];
 
     if (!rawChannel) {
       return message.reply(
@@ -691,9 +693,11 @@ Uso: \`+anunciar <itemId> <#canal> <título>\``
       );
     }
 
-    const channelId = rawChannel.replace(/[<#>]/g, "");
+    const channelId =
+      rawChannel.replace(/[<#>]/g, "");
 
-    const titulo = args.slice(3).join(" ");
+    const titulo =
+      args.slice(3).join(" ");
 
     if (!titulo) {
       return message.reply(
@@ -703,9 +707,11 @@ Ejemplo: \`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS POR TIEMPO LIMITADO!\`
       );
     }
 
-    const loadingMsg = await message.reply("🔍 Buscando item en Rolimons...");
+    const loadingMsg =
+      await message.reply("🔍 Buscando item en Rolimons...");
 
-    const item = await getItemById(itemId);
+    const item =
+      await getItemById(itemId);
 
     if (!item) {
       return loadingMsg.edit(
@@ -716,7 +722,8 @@ Ejemplo: \`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS POR TIEMPO LIMITADO!\`
     let targetChannel;
 
     try {
-      targetChannel = await client.channels.fetch(channelId);
+      targetChannel =
+        await client.channels.fetch(channelId);
     } catch (err) {
       return loadingMsg.edit(
         `❌ No pude encontrar el canal \`${channelId}\`.\nVerifica el ID o la mención.`
@@ -724,7 +731,8 @@ Ejemplo: \`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS POR TIEMPO LIMITADO!\`
     }
 
     try {
-      const announceEmbed = createAnnouncementEmbed(item, titulo);
+      const announceEmbed =
+        createAnnouncementEmbed(item, titulo);
 
       await targetChannel.send({
         embeds: [announceEmbed]
