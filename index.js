@@ -10,14 +10,12 @@ const {
 // =====================
 
 const client = new Client({
-
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers
   ]
-
 });
 
 // =====================
@@ -48,38 +46,47 @@ client.once("clientReady", () => {
 
 async function getItems() {
 
-  const response =
-    await fetch("https://www.rolimons.com/free-roblox-limiteds");
-
-  const html =
-    await response.text();
-
-  const match =
-    html.match(/item_details\s*=\s*(\{[\s\S]*?\});/);
-
-  if (!match) {
-    console.log("❌ item_details no encontrado");
-    return null;
-  }
-
-  let data;
-
   try {
-    data = JSON.parse(match[1]);
-  } catch (err) {
-    console.log(err);
-    return null;
-  }
 
-  return Object.entries(data).map(([id, item]) => ({
-    id,
-    name: item[0],
-    timestamp: item[1],
-    totalStock: item[2],
-    availableStock: item[3],
-    thumbnail: item[5],
-    games: item[6]
-  }));
+    const response =
+      await fetch("https://www.rolimons.com/free-roblox-limiteds");
+
+    const html =
+      await response.text();
+
+    const match =
+      html.match(/item_details\s*=\s*(\{[\s\S]*?\});/);
+
+    if (!match) {
+      console.log("❌ item_details no encontrado");
+      return null;
+    }
+
+    let data;
+
+    try {
+      data = JSON.parse(match[1]);
+    } catch (err) {
+      console.log("❌ Error parseando JSON:", err);
+      return null;
+    }
+
+    return Object.entries(data).map(([id, item]) => ({
+      id,
+      name: item[0],
+      timestamp: item[1],
+      totalStock: item[2],
+      availableStock: item[3],
+      thumbnail: item[5],
+      games: item[6]
+    }));
+
+  } catch (err) {
+
+    console.log("❌ Error obteniendo items:", err);
+    return null;
+
+  }
 
 }
 
@@ -100,7 +107,7 @@ async function getItemById(itemId) {
 }
 
 // =====================
-// SEARCH ITEM
+// SEARCH ITEMS
 // =====================
 
 async function searchItems(query) {
@@ -135,41 +142,58 @@ async function searchItems(query) {
 }
 
 // =====================
-// ROBLOX EVENTS DATA
+// GET UNIVERSE ID
 // =====================
 
 async function getUniverseIdFromPlaceId(placeId) {
 
   try {
 
-    const res =
-      await fetch(
-        `https://games.roblox.com/v1/games/multiget-place-details?placeIds=${placeId}`
-      );
+    console.log("🔍 Buscando universeId para:", placeId);
 
-    if (!res.ok)
+    const res = await fetch(
+      `https://apis.roblox.com/universes/v1/places/${placeId}/universe`
+    );
+
+    if (!res.ok) {
+
+      console.log("❌ Universe API status:", res.status);
+
       return null;
+
+    }
 
     const data =
       await res.json();
 
-    return data?.[0]?.universeId || null;
+    console.log("✅ Universe data:", data);
+
+    return data?.universeId || null;
 
   } catch (err) {
 
     console.log("❌ Error obteniendo universeId:", err);
+
     return null;
 
   }
 
 }
 
+// =====================
+// EVENTS
+// =====================
+
 async function getExperienceEvents(placeId) {
 
   try {
 
+    console.log("🎮 PlaceId:", placeId);
+
     const universeId =
       await getUniverseIdFromPlaceId(placeId);
+
+    console.log("🌎 UniverseId:", universeId);
 
     if (!universeId)
       return null;
@@ -178,18 +202,24 @@ async function getExperienceEvents(placeId) {
       new Date();
 
     const fromUtc =
-      new Date(now.getTime() - 1000 * 60 * 60 * 24 * 30)
-        .toISOString();
+      new Date(
+        now.getTime() - 1000 * 60 * 60 * 24 * 30
+      ).toISOString();
 
     const toUtc =
-      new Date(now.getTime() + 1000 * 60 * 60 * 24 * 60)
-        .toISOString();
+      new Date(
+        now.getTime() + 1000 * 60 * 60 * 24 * 60
+      ).toISOString();
 
     const url =
-      `https://apis.roblox.com/virtual-events/v1/virtual-events?fromUtc=${encodeURIComponent(fromUtc)}&toUtc=${encodeURIComponent(toUtc)}&universeIds=${universeId}`;
+`https://apis.roblox.com/virtual-events/v1/virtual-events?fromUtc=${encodeURIComponent(fromUtc)}&toUtc=${encodeURIComponent(toUtc)}&universeIds=${universeId}`;
+
+    console.log("🌐 Events URL:", url);
 
     const res =
       await fetch(url);
+
+    console.log("📡 Events status:", res.status);
 
     if (!res.ok)
       return null;
@@ -197,16 +227,29 @@ async function getExperienceEvents(placeId) {
     const data =
       await res.json();
 
+    console.log(
+      "✅ Events data:",
+      JSON.stringify(data).slice(0, 2000)
+    );
+
     const events =
       data?.data || [];
 
-    if (!events.length)
+    if (!events.length) {
+
+      console.log("❌ No events");
+
       return null;
+
+    }
 
     const event =
       events[0];
 
+    console.log("🔥 Event found:", event.title);
+
     return {
+
       title:
         event.title ||
         event.displayTitle ||
@@ -228,16 +271,25 @@ async function getExperienceEvents(placeId) {
       endTime:
         event.eventTime?.endUtc ||
         null
+
     };
 
   } catch (err) {
 
-    console.log("❌ Error obteniendo eventos:", err);
+    console.log(
+      "❌ Error obteniendo eventos:",
+      err
+    );
+
     return null;
 
   }
 
 }
+
+// =====================
+// FORMAT DATE
+// =====================
 
 function formatEventDate(value) {
 
@@ -258,7 +310,7 @@ function formatEventDate(value) {
 }
 
 // =====================
-// EMBEDS
+// EMBED
 // =====================
 
 async function createItemEmbed(item) {
@@ -266,17 +318,23 @@ async function createItemEmbed(item) {
   const gameText =
     item.games?.length
       ? item.games
-          .map(g => `[${g.name}](https://www.roblox.com/games/${g.game_id})`)
+          .map(g =>
+            `[${g.name}](https://www.roblox.com/games/${g.game_id})`
+          )
           .join("\n")
       : "Unknown";
 
   const firstGameId =
     item.games?.[0]?.game_id;
 
+  console.log("🎯 Game ID:", firstGameId);
+
   const eventData =
     firstGameId
       ? await getExperienceEvents(firstGameId)
       : null;
+
+  console.log("📅 EventData:", eventData);
 
   const eventText =
     eventData
@@ -292,16 +350,22 @@ ${eventData.description}`
 
     .setTitle(item.name.toUpperCase())
 
-    .setURL(`https://www.roblox.com/catalog/${item.id}`)
+    .setURL(
+      `https://www.roblox.com/catalog/${item.id}`
+    )
 
     .setThumbnail(item.thumbnail)
 
     .setImage(
-      item.thumbnail.replace("/150/150/", "/420/420/")
+      item.thumbnail.replace(
+        "/150/150/",
+        "/420/420/"
+      )
     )
 
     .setDescription(
-      `# 📦 STOCK\n# ${item.availableStock}/${item.totalStock}`
+`# 📦 STOCK
+# ${item.availableStock}/${item.totalStock}`
     )
 
     .addFields(
@@ -317,7 +381,8 @@ ${eventData.description}`
       },
       {
         name: "🔗 ITEM",
-        value: `https://www.roblox.com/catalog/${item.id}`,
+        value:
+`https://www.roblox.com/catalog/${item.id}`,
         inline: false
       },
       {
@@ -336,7 +401,7 @@ ${eventData.description}`
 }
 
 // =====================
-// EMBED DE ANUNCIO
+// ANNOUNCEMENT EMBED
 // =====================
 
 function createAnnouncementEmbed(item, titulo) {
@@ -353,7 +418,10 @@ function createAnnouncementEmbed(item, titulo) {
     )
 
     .setImage(
-      item.thumbnail.replace("/150/150/", "/420/420/")
+      item.thumbnail.replace(
+        "/150/150/",
+        "/420/420/"
+      )
     )
 
     .setColor(0xff0000)
@@ -365,7 +433,7 @@ function createAnnouncementEmbed(item, titulo) {
 }
 
 // =====================
-// LOOP CHECK
+// LOOP
 // =====================
 
 setInterval(async () => {
@@ -379,7 +447,9 @@ setInterval(async () => {
   if (!items)
     return;
 
-  items.sort((a, b) => b.timestamp - a.timestamp);
+  items.sort((a, b) =>
+    b.timestamp - a.timestamp
+  );
 
   const newest =
     items[0];
@@ -400,7 +470,9 @@ setInterval(async () => {
       ]
     });
 
-    console.log(`🔥 Nuevo item enviado: ${newest.name}`);
+    console.log(
+      `🔥 Nuevo item enviado: ${newest.name}`
+    );
 
   } catch (err) {
 
@@ -411,7 +483,7 @@ setInterval(async () => {
 }, 10000);
 
 // =====================
-// MESSAGES
+// COMMANDS
 // =====================
 
 client.on("messageCreate", async (message) => {
@@ -421,15 +493,19 @@ client.on("messageCreate", async (message) => {
 
   if (
     message.content.startsWith("+") &&
-    !message.member?.permissions?.has(PermissionsBitField.Flags.Administrator)
+    !message.member?.permissions?.has(
+      PermissionsBitField.Flags.Administrator
+    )
   ) {
-    return message.reply("❌ Solo administradores pueden usar este bot.");
+    return message.reply(
+      "❌ Solo administradores pueden usar este bot."
+    );
   }
 
-  console.log(message.content);
+  console.log("💬", message.content);
 
   // =====================
-  // +ping
+  // PING
   // =====================
 
   if (message.content === "+ping") {
@@ -437,87 +513,7 @@ client.on("messageCreate", async (message) => {
   }
 
   // =====================
-  // +help
-  // =====================
-
-  if (message.content === "+help") {
-
-    const embed =
-      new EmbedBuilder()
-
-        .setTitle("📚 COMANDOS DISPONIBLES")
-
-        .setDescription("# 😈 Jory Commands")
-
-        .addFields(
-          {
-            name: "🏓 +ping",
-            value: "Verifica si el bot está online.",
-            inline: false
-          },
-          {
-            name: "🔥 +actual",
-            value: "Muestra el item más reciente.",
-            inline: false
-          },
-          {
-            name: "🔥 +actual 5",
-            value: "Muestra varios items recientes.",
-            inline: false
-          },
-          {
-            name: "🔎 +buscar <id o nombre>",
-            value:
-`Busca un item exacto por ID o por nombre.
-Ejemplo:
-\`+buscar 123456789\`
-\`+buscar crown\``,
-            inline: false
-          },
-          {
-            name: "📦 +stok 100",
-            value: "Busca items con 100 stock disponible.",
-            inline: false
-          },
-          {
-            name: "📦 +sstok 100",
-            value: "Busca items con 100 stock total.",
-            inline: false
-          },
-          {
-            name: "🔄 +loop [canalId]",
-            value: "Activa detección automática de nuevos items.",
-            inline: false
-          },
-          {
-            name: "🛑 +stop",
-            value: "Detiene el loop automático.",
-            inline: false
-          },
-          {
-            name: "📢 +anunciar <itemId> <#canal> <título>",
-            value:
-`Busca el accesorio por ID y lo anuncia en el canal.
-Ejemplo:
-\`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS!\``,
-            inline: false
-          }
-        )
-
-        .setColor(0xff0000)
-
-        .setFooter({
-          text: "Jory 😈"
-        });
-
-    return message.reply({
-      embeds: [embed]
-    });
-
-  }
-
-  // =====================
-  // +actual
+  // ACTUAL
   // =====================
 
   if (message.content.startsWith("+actual")) {
@@ -532,9 +528,13 @@ Ejemplo:
       await getItems();
 
     if (!items)
-      return message.reply("❌ Error obteniendo items");
+      return message.reply(
+        "❌ Error obteniendo items"
+      );
 
-    items.sort((a, b) => b.timestamp - a.timestamp);
+    items.sort((a, b) =>
+      b.timestamp - a.timestamp
+    );
 
     for (const item of items.slice(0, amount)) {
 
@@ -551,42 +551,44 @@ Ejemplo:
   }
 
   // =====================
-  // +buscar
+  // BUSCAR
   // =====================
 
   if (message.content.startsWith("+buscar")) {
 
     const query =
-      message.content.replace("+buscar", "").trim();
+      message.content
+        .replace("+buscar", "")
+        .trim();
 
     if (!query) {
       return message.reply(
 `❌ Usa:
-\`+buscar <id o nombre>\`
-
-Ejemplo:
-\`+buscar 123456789\`
-\`+buscar crown\``
+\`+buscar <id o nombre>\``
       );
     }
 
     const loadingMsg =
-      await message.reply("🔎 Buscando item...");
+      await message.reply(
+        "🔎 Buscando item..."
+      );
 
     const results =
       await searchItems(query);
 
     if (!results || results.length === 0) {
+
       return loadingMsg.edit(
         `❌ No encontré resultados para: \`${query}\``
       );
+
     }
 
     const limitedResults =
       results.slice(0, 5);
 
     await loadingMsg.edit(
-      `✅ Encontré ${results.length} resultado(s). Mostrando ${limitedResults.length}:`
+`✅ Encontré ${results.length} resultado(s).`
     );
 
     for (const item of limitedResults) {
@@ -604,48 +606,7 @@ Ejemplo:
   }
 
   // =====================
-  // +sstok
-  // =====================
-
-  if (message.content.startsWith("+sstok")) {
-
-    const args =
-      message.content.split(" ");
-
-    const stock =
-      parseInt(args[1]);
-
-    if (!stock)
-      return message.reply("❌ Usa: +sstok 100");
-
-    const items =
-      await getItems();
-
-    if (!items)
-      return;
-
-    const filtered =
-      items.filter(x => x.totalStock === stock);
-
-    if (filtered.length === 0)
-      return message.reply("❌ No encontrados");
-
-    for (const item of filtered.slice(0, 10)) {
-
-      await message.channel.send({
-        embeds: [
-          await createItemEmbed(item)
-        ]
-      });
-
-    }
-
-    return;
-
-  }
-
-  // =====================
-  // +stok
+  // STOCK
   // =====================
 
   if (message.content.startsWith("+stok")) {
@@ -657,7 +618,9 @@ Ejemplo:
       parseInt(args[1]);
 
     if (!stock)
-      return message.reply("❌ Usa: +stok 100");
+      return message.reply(
+        "❌ Usa: +stok 100"
+      );
 
     const items =
       await getItems();
@@ -666,10 +629,14 @@ Ejemplo:
       return;
 
     const filtered =
-      items.filter(x => x.availableStock === stock);
+      items.filter(
+        x => x.availableStock === stock
+      );
 
-    if (filtered.length === 0)
-      return message.reply("❌ No encontrados");
+    if (!filtered.length)
+      return message.reply(
+        "❌ No encontrados"
+      );
 
     for (const item of filtered.slice(0, 10)) {
 
@@ -681,136 +648,48 @@ Ejemplo:
 
     }
 
-    return;
-
   }
 
   // =====================
-  // +loop
+  // TOTAL STOCK
   // =====================
 
-  if (message.content.startsWith("+loop")) {
+  if (message.content.startsWith("+sstok")) {
 
     const args =
       message.content.split(" ");
 
-    const channelId =
-      args[1] || message.channel.id;
+    const stock =
+      parseInt(args[1]);
 
-    loopEnabled = true;
-    loopChannel = channelId;
-    sentItems.clear();
-
-    return message.reply(
-      `🔥 Loop activado 😈\nCanal: ${channelId}`
-    );
-
-  }
-
-  // =====================
-  // +stop
-  // =====================
-
-  if (message.content === "+stop") {
-
-    loopEnabled = false;
-    loopChannel = null;
-
-    return message.reply("🛑 Loop detenido 😈");
-
-  }
-
-  // =====================
-  // +anunciar
-  // =====================
-
-  if (message.content.startsWith("+anunciar")) {
-
-    const args =
-      message.content.split(" ");
-
-    const itemId =
-      args[1];
-
-    if (!itemId) {
+    if (!stock)
       return message.reply(
-`❌ Falta el ID del item.
-Uso: \`+anunciar <itemId> <#canal> <título>\`
-Ejemplo: \`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS!\``
+        "❌ Usa: +sstok 100"
       );
-    }
 
-    const rawChannel =
-      args[2];
+    const items =
+      await getItems();
 
-    if (!rawChannel) {
+    if (!items)
+      return;
+
+    const filtered =
+      items.filter(
+        x => x.totalStock === stock
+      );
+
+    if (!filtered.length)
       return message.reply(
-`❌ Falta el canal.
-Uso: \`+anunciar <itemId> <#canal> <título>\``
-      );
-    }
-
-    const channelId =
-      rawChannel.replace(/[<#>]/g, "");
-
-    const titulo =
-      args.slice(3).join(" ");
-
-    if (!titulo) {
-      return message.reply(
-`❌ Falta el título del anuncio.
-Uso: \`+anunciar <itemId> <#canal> <título>\`
-Ejemplo: \`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS POR TIEMPO LIMITADO!\``
-      );
-    }
-
-    const loadingMsg =
-      await message.reply("🔍 Buscando item en Rolimons...");
-
-    const item =
-      await getItemById(itemId);
-
-    if (!item) {
-      return loadingMsg.edit(
-        `❌ No encontré el item con ID \`${itemId}\` en Rolimons.\nVerifica que el ID sea correcto.`
-      );
-    }
-
-    let targetChannel;
-
-    try {
-
-      targetChannel =
-        await client.channels.fetch(channelId);
-
-    } catch (err) {
-
-      return loadingMsg.edit(
-        `❌ No pude encontrar el canal \`${channelId}\`.\nVerifica el ID o la mención.`
+        "❌ No encontrados"
       );
 
-    }
+    for (const item of filtered.slice(0, 10)) {
 
-    try {
-
-      const announceEmbed =
-        createAnnouncementEmbed(item, titulo);
-
-      await targetChannel.send({
-        embeds: [announceEmbed]
+      await message.channel.send({
+        embeds: [
+          await createItemEmbed(item)
+        ]
       });
-
-      return loadingMsg.edit(
-        `✅ Anuncio de **${item.name}** enviado a <#${channelId}> 😈`
-      );
-
-    } catch (err) {
-
-      console.error("❌ Error enviando anuncio:", err);
-
-      return loadingMsg.edit(
-        `❌ No pude enviar en <#${channelId}>. Verifica que el bot tenga permisos en ese canal.`
-      );
 
     }
 
