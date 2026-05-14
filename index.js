@@ -95,6 +95,40 @@ async function getItemById(itemId) {
 }
 
 // =====================
+// SEARCH ITEM
+// =====================
+
+async function searchItems(query) {
+
+  const items = await getItems();
+
+  if (!items) return null;
+
+  const cleanQuery = query.toLowerCase().trim();
+
+  const exactId =
+    items.find(x => x.id === query.trim());
+
+  if (exactId) {
+    return [exactId];
+  }
+
+  const exactName =
+    items.filter(x =>
+      x.name.toLowerCase() === cleanQuery
+    );
+
+  if (exactName.length > 0) {
+    return exactName;
+  }
+
+  return items.filter(x =>
+    x.name.toLowerCase().includes(cleanQuery)
+  );
+
+}
+
+// =====================
 // ROBLOX EVENTS DATA
 // =====================
 
@@ -406,6 +440,16 @@ client.on("messageCreate", async (message) => {
         },
 
         {
+          name: "🔎 +buscar <id o nombre>",
+          value:
+`Busca un item exacto por ID o por nombre.
+Ejemplo:
+\`+buscar 123456789\`
+\`+buscar crown\``,
+          inline: false
+        },
+
+        {
           name: "📦 +stok 100",
           value: "Busca items con 100 stock disponible.",
           inline: false
@@ -461,6 +505,59 @@ Ejemplo:
     items.sort((a, b) => b.timestamp - a.timestamp);
 
     for (const item of items.slice(0, amount)) {
+
+      await message.channel.send({
+        embeds: [
+          await createItemEmbed(item)
+        ]
+      });
+
+    }
+
+    return;
+
+  }
+
+  // ══════════════════════════════
+  // +buscar
+  // ══════════════════════════════
+
+  if (message.content.startsWith("+buscar")) {
+
+    const query =
+      message.content.replace("+buscar", "").trim();
+
+    if (!query) {
+      return message.reply(
+`❌ Usa:
+\`+buscar <id o nombre>\`
+
+Ejemplo:
+\`+buscar 123456789\`
+\`+buscar crown\``
+      );
+    }
+
+    const loadingMsg =
+      await message.reply("🔎 Buscando item...");
+
+    const results =
+      await searchItems(query);
+
+    if (!results || results.length === 0) {
+      return loadingMsg.edit(
+        `❌ No encontré resultados para: \`${query}\``
+      );
+    }
+
+    const limitedResults =
+      results.slice(0, 5);
+
+    await loadingMsg.edit(
+      `✅ Encontré ${results.length} resultado(s). Mostrando ${limitedResults.length}:`
+    );
+
+    for (const item of limitedResults) {
 
       await message.channel.send({
         embeds: [
