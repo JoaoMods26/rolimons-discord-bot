@@ -32,7 +32,7 @@ const TOKEN = process.env.TOKEN;
 
 let loopEnabled = false;
 let loopChannel = null;
-let sentItems   = new Set();
+let sentItems = new Set();
 
 // =====================
 // ONLINE
@@ -51,8 +51,8 @@ client.once("clientReady", () => {
 async function getItems() {
 
   const response = await fetch("https://www.rolimons.com/free-roblox-limiteds");
-  const html     = await response.text();
-  const match    = html.match(/item_details\s*=\s*(\{[\s\S]*?\});/);
+  const html = await response.text();
+  const match = html.match(/item_details\s*=\s*(\{[\s\S]*?\});/);
 
   if (!match) {
     console.log("❌ item_details no encontrado");
@@ -70,19 +70,18 @@ async function getItems() {
 
   return Object.entries(data).map(([id, item]) => ({
     id,
-    name:           item[0],
-    timestamp:      item[1],
-    totalStock:     item[2],
+    name: item[0],
+    timestamp: item[1],
+    totalStock: item[2],
     availableStock: item[3],
-    thumbnail:      item[5],
-    games:          item[6]
+    thumbnail: item[5],
+    games: item[6]
   }));
 
 }
 
 // =====================
 // GET ITEM BY ID
-// Busca directamente por ID desde Rolimons
 // =====================
 
 async function getItemById(itemId) {
@@ -96,10 +95,135 @@ async function getItemById(itemId) {
 }
 
 // =====================
+// ROBLOX EVENTS DATA
+// =====================
+
+async function getUniverseIdFromPlaceId(placeId) {
+
+  try {
+
+    const res = await fetch(
+      `https://games.roblox.com/v1/games/multiget-place-details?placeIds=${placeId}`
+    );
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+
+    return data?.[0]?.universeId || null;
+
+  } catch (err) {
+
+    console.log("❌ Error obteniendo universeId:", err);
+    return null;
+
+  }
+
+}
+
+async function getExperienceEvents(placeId) {
+
+  try {
+
+    const universeId = await getUniverseIdFromPlaceId(placeId);
+
+    if (!universeId) return null;
+
+    const endpoints = [
+
+      `https://apis.roblox.com/virtual-events/v2/universes/${universeId}/experience-events`,
+
+      `https://apis.roblox.com/virtual-events/v1/universes/${universeId}/experience-events`
+
+    ];
+
+    for (const endpoint of endpoints) {
+
+      const res = await fetch(endpoint);
+
+      if (!res.ok) continue;
+
+      const data = await res.json();
+
+      const events =
+        data?.experienceEvents ||
+        data?.events ||
+        data?.data ||
+        [];
+
+      if (!Array.isArray(events) || events.length === 0) {
+        continue;
+      }
+
+      const event = events[0];
+
+      return {
+        title:
+          event.title ||
+          event.name ||
+          "Evento sin título",
+
+        subtitle:
+          event.subtitle ||
+          event.tagline ||
+          event.shortDescription ||
+          "Sin subtítulo",
+
+        description:
+          event.description ||
+          event.longDescription ||
+          "Sin descripción",
+
+        startTime:
+          event.startTime ||
+          event.startDate ||
+          event.startsAt ||
+          event.eventStartTime ||
+          null,
+
+        endTime:
+          event.endTime ||
+          event.endDate ||
+          event.endsAt ||
+          event.eventEndTime ||
+          null
+      };
+
+    }
+
+    return null;
+
+  } catch (err) {
+
+    console.log("❌ Error obteniendo eventos:", err);
+    return null;
+
+  }
+
+}
+
+function formatEventDate(value) {
+
+  if (!value) return "Sin datos";
+
+  const date = new Date(value);
+
+  if (isNaN(date.getTime())) {
+    return "Sin datos";
+  }
+
+  return date.toLocaleString("es-ES", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  });
+
+}
+
+// =====================
 // EMBEDS
 // =====================
 
-function createItemEmbed(item) {
+async function createItemEmbed(item) {
 
   const gameText =
     item.games?.length
@@ -107,6 +231,24 @@ function createItemEmbed(item) {
           .map(g => `[${g.name}](https://www.roblox.com/games/${g.game_id})`)
           .join("\n")
       : "Unknown";
+
+  const firstGameId =
+    item.games?.[0]?.game_id;
+
+  const eventData =
+    firstGameId
+      ? await getExperienceEvents(firstGameId)
+      : null;
+
+  const eventText =
+    eventData
+      ? `**${eventData.title}**
+${eventData.subtitle}
+
+🕒 ${formatEventDate(eventData.startTime)} - ${formatEventDate(eventData.endTime)}
+
+${eventData.description}`
+      : "Sin datos de eventos";
 
   return new EmbedBuilder()
 
@@ -117,18 +259,23 @@ function createItemEmbed(item) {
     .setDescription(`# 📦 STOCK\n# ${item.availableStock}/${item.totalStock}`)
     .addFields(
       {
-        name:   "🎮 JUEGO",
-        value:  gameText,
+        name: "🎮 JUEGO",
+        value: gameText,
         inline: false
       },
       {
-        name:   "🔗 ITEM",
-        value:  `https://www.roblox.com/catalog/${item.id}`,
+        name: "📅 EVENTO",
+        value: eventText.slice(0, 1024),
         inline: false
       },
       {
-        name:   "🆔 ID",
-        value:  `\`${item.id}\``,
+        name: "🔗 ITEM",
+        value: `https://www.roblox.com/catalog/${item.id}`,
+        inline: false
+      },
+      {
+        name: "🆔 ID",
+        value: `\`${item.id}\``,
         inline: false
       }
     )
@@ -139,9 +286,6 @@ function createItemEmbed(item) {
 
 // =====================
 // EMBED DE ANUNCIO
-// Título = texto que escribió el admin
-// Subtítulo = nombre del accesorio
-// Imagen grande = thumbnail del accesorio
 // =====================
 
 function createAnnouncementEmbed(item, titulo) {
@@ -150,7 +294,12 @@ function createAnnouncementEmbed(item, titulo) {
 
     .setTitle(titulo)
 
-    .setDescription(`## ${item.name}`)
+    .setDescription(
+`## ${item.name}
+
+# 📦 STOCK
+# ${item.availableStock}/${item.totalStock}`
+    )
 
     .setImage(item.thumbnail.replace("/150/150/", "/420/420/"))
 
@@ -183,7 +332,11 @@ setInterval(async () => {
 
     const channel = await client.channels.fetch(loopChannel);
 
-    await channel.send({ embeds: [createItemEmbed(newest)] });
+    await channel.send({
+      embeds: [
+        await createItemEmbed(newest)
+      ]
+    });
 
     console.log(`🔥 Nuevo item enviado: ${newest.name}`);
 
@@ -235,53 +388,53 @@ client.on("messageCreate", async (message) => {
       .addFields(
 
         {
-          name:   "🏓 +ping",
-          value:  "Verifica si el bot está online.",
+          name: "🏓 +ping",
+          value: "Verifica si el bot está online.",
           inline: false
         },
 
         {
-          name:   "🔥 +actual",
-          value:  "Muestra el item más reciente.",
+          name: "🔥 +actual",
+          value: "Muestra el item más reciente.",
           inline: false
         },
 
         {
-          name:   "🔥 +actual 5",
-          value:  "Muestra varios items recientes.",
+          name: "🔥 +actual 5",
+          value: "Muestra varios items recientes.",
           inline: false
         },
 
         {
-          name:   "📦 +stok 100",
-          value:  "Busca items con 100 stock disponible.",
+          name: "📦 +stok 100",
+          value: "Busca items con 100 stock disponible.",
           inline: false
         },
 
         {
-          name:   "📦 +sstok 100",
-          value:  "Busca items con 100 stock total.",
+          name: "📦 +sstok 100",
+          value: "Busca items con 100 stock total.",
           inline: false
         },
 
         {
-          name:   "🔄 +loop [canalId]",
-          value:  "Activa detección automática de nuevos items.",
+          name: "🔄 +loop [canalId]",
+          value: "Activa detección automática de nuevos items.",
           inline: false
         },
 
         {
-          name:   "🛑 +stop",
-          value:  "Detiene el loop automático.",
+          name: "🛑 +stop",
+          value: "Detiene el loop automático.",
           inline: false
         },
 
         {
-          name:   "📢 +anunciar <itemId> <#canal> <título del anuncio>",
+          name: "📢 +anunciar <itemId> <#canal> <título>",
           value:
-`Busca el accesorio en Rolimons por su ID y lo anuncia en el canal con tu título.
+`Busca el accesorio por ID y lo anuncia en el canal.
 Ejemplo:
-\`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS POR TIEMPO LIMITADO!\``,
+\`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS!\``,
           inline: false
         }
 
@@ -299,9 +452,9 @@ Ejemplo:
 
   if (message.content.startsWith("+actual")) {
 
-    const args   = message.content.split(" ");
+    const args = message.content.split(" ");
     const amount = parseInt(args[1]) || 1;
-    const items  = await getItems();
+    const items = await getItems();
 
     if (!items) return message.reply("❌ Error obteniendo items");
 
@@ -310,7 +463,9 @@ Ejemplo:
     for (const item of items.slice(0, amount)) {
 
       await message.channel.send({
-        embeds: [createItemEmbed(item)]
+        embeds: [
+          await createItemEmbed(item)
+        ]
       });
 
     }
@@ -320,12 +475,12 @@ Ejemplo:
   }
 
   // ══════════════════════════════
-  // +sstok (total stock)
+  // +sstok
   // ══════════════════════════════
 
   if (message.content.startsWith("+sstok")) {
 
-    const args  = message.content.split(" ");
+    const args = message.content.split(" ");
     const stock = parseInt(args[1]);
 
     if (!stock) return message.reply("❌ Usa: +sstok 100");
@@ -340,7 +495,9 @@ Ejemplo:
     for (const item of filtered.slice(0, 10)) {
 
       await message.channel.send({
-        embeds: [createItemEmbed(item)]
+        embeds: [
+          await createItemEmbed(item)
+        ]
       });
 
     }
@@ -350,12 +507,12 @@ Ejemplo:
   }
 
   // ══════════════════════════════
-  // +stok (available stock)
+  // +stok
   // ══════════════════════════════
 
   if (message.content.startsWith("+stok")) {
 
-    const args  = message.content.split(" ");
+    const args = message.content.split(" ");
     const stock = parseInt(args[1]);
 
     if (!stock) return message.reply("❌ Usa: +stok 100");
@@ -370,7 +527,9 @@ Ejemplo:
     for (const item of filtered.slice(0, 10)) {
 
       await message.channel.send({
-        embeds: [createItemEmbed(item)]
+        embeds: [
+          await createItemEmbed(item)
+        ]
       });
 
     }
@@ -385,7 +544,7 @@ Ejemplo:
 
   if (message.content.startsWith("+loop")) {
 
-    const args      = message.content.split(" ");
+    const args = message.content.split(" ");
     const channelId = args[1] || message.channel.id;
 
     loopEnabled = true;
@@ -410,23 +569,12 @@ Ejemplo:
   }
 
   // ══════════════════════════════
-  // +anunciar <itemId> <#canal> <título>
-  //
-  // Ejemplo:
-  //   +anunciar 12345678 #ugc-free 🔥 ITEM GRATIS AHORA!
-  //
-  // El bot busca el ID directamente en Rolimons,
-  // no necesita cache ni nada previo.
+  // +anunciar
   // ══════════════════════════════
 
   if (message.content.startsWith("+anunciar")) {
 
     const args = message.content.split(" ");
-
-    // args[0] = "+anunciar"
-    // args[1] = itemId
-    // args[2] = #canal o canalId
-    // args[3..] = título del anuncio
 
     const itemId = args[1];
 
@@ -447,10 +595,8 @@ Uso: \`+anunciar <itemId> <#canal> <título>\``
       );
     }
 
-    // Limpiar mención: <#123456> → 123456
     const channelId = rawChannel.replace(/[<#>]/g, "");
 
-    // El título es todo lo que viene después del canal
     const titulo = args.slice(3).join(" ");
 
     if (!titulo) {
@@ -461,7 +607,6 @@ Ejemplo: \`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS POR TIEMPO LIMITADO!\`
       );
     }
 
-    // Buscar el item en Rolimons por ID
     const loadingMsg = await message.reply("🔍 Buscando item en Rolimons...");
 
     const item = await getItemById(itemId);
@@ -472,7 +617,6 @@ Ejemplo: \`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS POR TIEMPO LIMITADO!\`
       );
     }
 
-    // Obtener canal destino
     let targetChannel;
 
     try {
@@ -487,7 +631,6 @@ Ejemplo: \`+anunciar 123456789 #ugc-free 🔥 ITEM GRATIS POR TIEMPO LIMITADO!\`
 
     }
 
-    // Enviar anuncio
     try {
 
       const announceEmbed = createAnnouncementEmbed(item, titulo);
