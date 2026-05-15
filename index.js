@@ -90,31 +90,111 @@ async function getItemById(itemId) {
   return items.find(x => x.id === itemId) || null;
 }
 
+async function resolveSearchQuery(query) {
+
+  const text =
+    query.trim();
+
+  const catalogMatch =
+    text.match(/roblox\.com\/catalog\/(\d+)/i);
+
+  if (catalogMatch) {
+    return catalogMatch[1];
+  }
+
+  if (/^\d+$/.test(text)) {
+    return text;
+  }
+
+  if (text.includes("roblox.com/share")) {
+
+    try {
+
+      const res =
+        await fetch(text, {
+          redirect: "follow"
+        });
+
+      const finalUrl =
+        res.url || "";
+
+      const finalMatch =
+        finalUrl.match(/roblox\.com\/catalog\/(\d+)/i);
+
+      if (finalMatch) {
+        return finalMatch[1];
+      }
+
+      const html =
+        await res.text();
+
+      const htmlMatch =
+        html.match(/\/catalog\/(\d+)/i) ||
+        html.match(/"assetId"\s*:\s*(\d+)/i) ||
+        html.match(/"itemId"\s*:\s*(\d+)/i);
+
+      if (htmlMatch) {
+        return htmlMatch[1];
+      }
+
+    } catch (err) {
+
+      console.log(
+        "❌ Error resolviendo share link:",
+        err
+      );
+
+    }
+
+  }
+
+  return text;
+
+}
+
+
 // =====================
 // SEARCH ITEMS
 // =====================
 
 async function searchItems(query) {
-  const items = await getItems();
-  if (!items) return null;
 
-  const cleanQuery = query.toLowerCase().trim();
+  const items =
+    await getItems();
+
+  if (!items)
+    return null;
+
+  const resolvedQuery =
+    await resolveSearchQuery(query);
+
+  const cleanQuery =
+    resolvedQuery.toLowerCase().trim();
 
   const exactId =
-    items.find(x => x.id === query.trim());
-
-  if (exactId) return [exactId];
-
-  const exactName =
-    items.filter(x =>
-      x.name.toLowerCase() === cleanQuery
+    items.find(
+      x => x.id === resolvedQuery.trim()
     );
 
-  if (exactName.length > 0) return exactName;
+  if (exactId)
+    return [exactId];
 
-  return items.filter(x =>
-    x.name.toLowerCase().includes(cleanQuery)
+  const exactName =
+    items.filter(
+      x =>
+        x.name.toLowerCase() === cleanQuery
+    );
+
+  if (exactName.length > 0)
+    return exactName;
+
+  return items.filter(
+    x =>
+      x.name
+        .toLowerCase()
+        .includes(cleanQuery)
   );
+
 }
 
 // =====================
@@ -413,7 +493,7 @@ client.on("messageCreate", async (message) => {
           inline: false
         },
         {
-          name: "🔎 +buscar <id o nombre>",
+          name: "🔎 +buscar <id, nombre o link>",
           value:
 `Busca un item exacto por ID o nombre.
 Ejemplo:
